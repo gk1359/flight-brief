@@ -1,5 +1,5 @@
-const CACHE = 'flight-brief-v3';
-const FILES = ['./', './index.html', './Pre-Dep%20Home%20Check.dc.html', './Station%20Altitude%20Sheet.dc.html', './Aircraft%20Brief.dc.html', './manifest.webmanifest'];
+const CACHE = 'flight-brief-v5';
+const FILES = ['./', './index.html', './Pre-Dep%20Home%20Check.dc.html', './Station%20Altitude%20Sheet.dc.html', './Aircraft%20Brief.dc.html', './manifest.webmanifest', './airports.json'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
 self.addEventListener('fetch', e => {
