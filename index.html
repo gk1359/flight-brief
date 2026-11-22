@@ -18,6 +18,11 @@ h1{margin:0;font-size:28px}
 .row{display:flex;gap:12px;flex-wrap:wrap}
 label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted);flex:1;min-width:130px}
 input{font:inherit;font-size:20px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);background:var(--tile);border:1px solid var(--line);border-radius:14px;padding:10px 14px;width:100%;box-sizing:border-box}
+.stns{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:start}
+.stns label{min-width:0}
+.e{font-size:12px;font-weight:400;letter-spacing:0;color:var(--muted);min-height:16px}
+#flip{margin-top:20px;width:46px;height:46px;border-radius:999px;border:none;background:var(--accent);color:var(--accent-ink);font-size:22px;font-weight:700;cursor:pointer}
+.more{font-size:14px;font-weight:700;color:var(--accent);text-decoration:none}
 .route{display:block;text-decoration:none;color:inherit;padding:14px 16px;border-radius:16px;background:var(--tile)}
 .route .k{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
 .route .v{font-family:'B612 Mono',ui-monospace,monospace;font-size:24px;font-weight:700;margin-top:4px}
@@ -34,11 +39,13 @@ footer{margin-top:auto;text-align:center;font-family:'B612 Mono',ui-monospace,mo
     <label>FLT<input id="fn1" maxlength="8" placeholder="QR 1234" autocomplete="off"></label>
     <label>REG<input id="reg" maxlength="8" placeholder="A7-AHA" autocomplete="off"></label>
   </div>
-  <a class="route" href="Station%20Altitude%20Sheet.dc.html">
-    <div class="k">FLIGHT 1 · DEP → DEST</div>
-    <div class="v" id="route">— → —</div>
-    <div class="s" id="alt">ALT —</div>
-  </a>
+  <div class="stns">
+    <label>DEP<input id="s_dep" maxlength="4" placeholder="OTHH" autocomplete="off"><span class="e" id="e_dep"></span></label>
+    <button type="button" id="flip" aria-label="Reverse flight: swap DEP and DEST" title="Reverse flight">⇄</button>
+    <label>DEST<input id="s_dest" maxlength="4" placeholder="EGLL" autocomplete="off"><span class="e" id="e_dest"></span></label>
+    <label>ALT<input id="s_alt" maxlength="4" placeholder="EGKK" autocomplete="off"><span class="e" id="e_alt"></span></label>
+  </div>
+  <a class="more" href="Station%20Altitude%20Sheet.dc.html">Flight 1 · full station details on the Station Page →</a>
 </section>
 
 <nav class="nav" aria-label="Pages">
@@ -56,13 +63,31 @@ function read(k){ try { return JSON.parse(localStorage.getItem(k) || '{}') || {}
 function stn(d){ d = d || {}; var c = String(d.code || '').toUpperCase(); return c ? c + (d.iata ? ' ' + d.iata : '') : '—'; }
 function elev(d){ return d && d.elev !== '' && d.elev != null ? ' · ' + d.elev + ' ft' : ''; }
 var fn = document.getElementById('fn1'), rg = document.getElementById('reg');
+var STN = ['dep', 'dest', 'alt'];
+function writeS(s){ try { localStorage.setItem(SKEY, JSON.stringify(s)); } catch (e) {} }
 function render(){
   var id = read(IDKEY), s = read(SKEY);
   if (document.activeElement !== fn) fn.value = id.fn1 || '';
   if (document.activeElement !== rg) rg.value = id.reg || '';
-  document.getElementById('route').textContent = stn(s.dep) + ' → ' + stn(s.dest);
-  document.getElementById('alt').textContent = 'ALT ' + stn(s.alt) + elev(s.alt) + '   ·   DEP' + (elev(s.dep) || ' —') + '   ·   DEST' + (elev(s.dest) || ' —');
+  STN.forEach(function(k){ var d = s[k] || {}, el = document.getElementById('s_' + k);
+    if (document.activeElement !== el) el.value = String(d.code || '').toUpperCase();
+    document.getElementById('e_' + k).textContent = d.code ? [d.iata, d.name, d.elev !== '' && d.elev != null ? d.elev + ' ft' : ''].filter(Boolean).join(' · ') : ''; });
 }
+// Airport lookup: bundled airports.json (ICAO: [elev ft, IATA, city]) — same data the Station Page uses
+var aptP = null;
+function apt(code){ if (!aptP) aptP = fetch('airports.json').then(function(r){ return r.ok ? r.json() : {}; }).catch(function(){ return {}; }); return aptP.then(function(db){ return db[code] || null; }); }
+function setStation(k, v){
+  v = v.toUpperCase().replace(/[^A-Z]/g, '');
+  var s = read(SKEY), prev = s[k] || {};
+  if (String(prev.code || '') === v) return;
+  s[k] = { code: v, elev: '' };                       // new airport → fresh station (old per-airport settings dropped)
+  writeS(s); render();
+  if (/^[A-Z]{4}$/.test(v)) apt(v).then(function(a){ var s2 = read(SKEY); if (!a || !s2[k] || s2[k].code !== v) return;
+    s2[k] = Object.assign({}, s2[k], { lookedUp: v, iata: a[1] || '', elev: String(a[0]), name: String(a[2] || '').toUpperCase() }); writeS(s2); render(); });
+}
+STN.forEach(function(k){ var el = document.getElementById('s_' + k); el.addEventListener('input', function(){ el.value = el.value.toUpperCase(); setStation(k, el.value); }); });
+// ⇄ Reverse flight: swap DEP and DEST with their station settings (ALT stays)
+document.getElementById('flip').addEventListener('click', function(){ var s = read(SKEY), t = s.dep; s.dep = s.dest || { code: '', elev: '' }; s.dest = t || { code: '', elev: '' }; writeS(s); render(); });
 function save(k, el){ var v = read(IDKEY); v[k] = el.value.toUpperCase(); try { localStorage.setItem(IDKEY, JSON.stringify(v)); } catch (e) {} }
 fn.addEventListener('input', function(){ save('fn1', fn); });
 rg.addEventListener('input', function(){ save('reg', rg); });
