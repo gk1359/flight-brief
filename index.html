@@ -1,14 +1,75 @@
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dispatch Briefing</title>
+<!-- Flight Brief · Copyright © 2026 GK Corp. All rights reserved.
+     Unauthorised copying, modification or distribution of this software is prohibited. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Flight Brief</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js');}</script>
-<style>body{margin:0;background:#f5ead8;color:#201e1d;font-family:-apple-system,sans-serif;padding:40px 24px;display:flex;flex-direction:column;gap:16px;max-width:480px}
-a{display:block;padding:20px 24px;border-radius:999px;background:#c67139;color:#fff;text-decoration:none;font-size:20px;font-weight:700}
-a:hover{background:#a85a28}h1{margin:0 0 8px;font-size:28px}</style></head>
-<body><h1>Flight briefing</h1>
-<a href="Pre-Dep%20Home%20Check.dc.html">Dispatch Briefing</a>
-<a href="Station%20Altitude%20Sheet.dc.html">Station Altitude Sheet</a>
-<a href="Aircraft%20Brief.dc.html">Aircraft Brief</a>
+<script>(function(){var q=window.matchMedia?matchMedia('(prefers-color-scheme: dark)'):null;function a(){var m='auto';try{m=localStorage.getItem('fb-theme')||'auto';}catch(e){}var t=m==='auto'?(q&&q.matches?'dark':'light'):m;document.documentElement.setAttribute('data-theme',t);}a();if(q&&q.addEventListener)q.addEventListener('change',a);window.addEventListener('storage',function(e){if(e.key==='fb-theme')a();});})();</script>
+<style>
+:root{--bg:#f5ead8;--card:#ebddc5;--tile:#ffffff;--text:#201e1d;--muted:#645c50;--accent:#8c491a;--accent-ink:#ffffff;--line:rgba(32,30,29,.16)}
+html[data-theme=dark],html[data-theme=night]{color-scheme:dark;--bg:#151413;--card:#211f1c;--tile:#2a2724;--text:#ece6dc;--muted:#b8b0a3;--accent:#b45f26;--line:rgba(236,230,220,.18)}
+html[data-theme=night]{--bg:#000;--card:#0f0d0b;--tile:#161310;--text:#d9b48c;--muted:#a8896a}
+html[data-theme=night] body{filter:brightness(.78)}
+body{margin:0 auto;background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,sans-serif;padding:32px 20px calc(32px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px;max-width:520px;min-height:100vh;box-sizing:border-box}
+h1{margin:0;font-size:28px}
+.card{display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:22px;background:var(--card)}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted);flex:1;min-width:130px}
+input{font:inherit;font-size:20px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);background:var(--tile);border:1px solid var(--line);border-radius:14px;padding:10px 14px;width:100%;box-sizing:border-box}
+.route{display:block;text-decoration:none;color:inherit;padding:14px 16px;border-radius:16px;background:var(--tile)}
+.route .k{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.route .v{font-family:'B612 Mono',ui-monospace,monospace;font-size:24px;font-weight:700;margin-top:4px}
+.route .s{font-size:13px;color:var(--muted);margin-top:4px}
+.nav a{display:block;padding:18px 24px;border-radius:999px;background:var(--accent);color:var(--accent-ink);text-decoration:none;font-size:19px;font-weight:700}
+.nav{display:flex;flex-direction:column;gap:12px}
+footer{margin-top:auto;text-align:center;font-family:'B612 Mono',ui-monospace,monospace;font-size:12px;letter-spacing:.06em;color:var(--muted)}
+</style></head>
+<body>
+<h1>Flight Brief</h1>
+
+<section class="card" aria-label="Current flight">
+  <div class="row">
+    <label>FLT<input id="fn1" maxlength="8" placeholder="QR 1234" autocomplete="off"></label>
+    <label>REG<input id="reg" maxlength="8" placeholder="A7-AHA" autocomplete="off"></label>
+  </div>
+  <a class="route" href="Station%20Altitude%20Sheet.dc.html">
+    <div class="k">FLIGHT 1 · DEP → DEST</div>
+    <div class="v" id="route">— → —</div>
+    <div class="s" id="alt">ALT —</div>
+  </a>
+</section>
+
+<nav class="nav" aria-label="Pages">
+  <a href="Pre-Dep%20Home%20Check.dc.html">Home Check</a>
+  <a href="Station%20Altitude%20Sheet.dc.html">Station Page</a>
+  <a href="Aircraft%20Brief.dc.html">Aircraft Brief</a>
+</nav>
+
+<footer>SQUAWK 2026 · IDENT: GK CORP · © ALL RIGHTS RESERVED · VER 3.2</footer>
+
+<script>
+// Shared with the other pages: 'flight-id-v1' {fn1, reg} and 'elevation-sheet-v1' (stations)
+var IDKEY = 'flight-id-v1', SKEY = 'elevation-sheet-v1';
+function read(k){ try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { return {}; } }
+function stn(d){ d = d || {}; var c = String(d.code || '').toUpperCase(); return c ? c + (d.iata ? ' ' + d.iata : '') : '—'; }
+function elev(d){ return d && d.elev !== '' && d.elev != null ? ' · ' + d.elev + ' ft' : ''; }
+var fn = document.getElementById('fn1'), rg = document.getElementById('reg');
+function render(){
+  var id = read(IDKEY), s = read(SKEY);
+  if (document.activeElement !== fn) fn.value = id.fn1 || '';
+  if (document.activeElement !== rg) rg.value = id.reg || '';
+  document.getElementById('route').textContent = stn(s.dep) + ' → ' + stn(s.dest);
+  document.getElementById('alt').textContent = 'ALT ' + stn(s.alt) + elev(s.alt) + '   ·   DEP' + (elev(s.dep) || ' —') + '   ·   DEST' + (elev(s.dest) || ' —');
+}
+function save(k, el){ var v = read(IDKEY); v[k] = el.value.toUpperCase(); try { localStorage.setItem(IDKEY, JSON.stringify(v)); } catch (e) {} }
+fn.addEventListener('input', function(){ save('fn1', fn); });
+rg.addEventListener('input', function(){ save('reg', rg); });
+window.addEventListener('storage', render);
+window.addEventListener('pageshow', render);           // coming back from another page (incl. back button)
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) render(); });
+setInterval(render, 1000);
+render();
+</script>
 </body></html>
